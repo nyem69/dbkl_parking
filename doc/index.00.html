@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+		<link rel="apple-touch-icon" href="http://static.aga.my/img/dkwr.png"/>
+
+<title></title>
+<link rel="stylesheet" href="/libjs/bootstrap/3.3.2/css/bootstrap.min.css">
+<link rel="stylesheet" href="/libjs/bootstrap/3.3.2/css/bootstrap-theme.min.css">
+<link href="/libjs/font/awesome/4.3.0/css/font-awesome.min.css" rel="stylesheet"/>
+
+<script src="/libjs/jquery/jquery-1.11.2.min.js"></script>
+<script src="/libjs/d3/3.5.3/d3.min.js"></script>
+<script src="/libjs/d3/plugins/d3.comparator.js"></script>
+<script src="/libjs/queue/1.0.7/queue.min.js"></script>
+
+<script src="/libjs/chroma/0.6.3/chroma.min.js"></script>
+
+<script src="/libjs/bootstrap/3.3.2/js/bootstrap.min.js"></script>
+<script src="/libjs/moment/2.9.0/moment.min.js"></script>
+
+<script src="//cdn.pubnub.com/pubnub-dev.js"></script>
+
+
+<!--
+<script src="/libjs/twitter/twitter-text-1.9.1.min.js"></script>
+<script src="/libjs/elasticsearch/2.4.3/elasticsearch.jquery.min.js"></script>
+-->
+
+
+<!-- highcharts -->
+<script src="/libjs/highcharts/4.0.4/highcharts.js"></script>
+
+
+
+<script src="/libjs/aga/style/aga.js"></script>
+
+<style>
+
+
+
+html,body {
+	background:#fff;
+	color:#000;
+	font-size:11px;
+	font-family: 'Helvetica Neue',Helvetica, Arial, sans-serif;
+}
+
+select, input {
+	font-family: 'Helvetica Neue',Helvetica, Arial, sans-serif;
+}
+
+
+svg text {
+	font-family: 'Helvetica Neue',Helvetica, Arial, sans-serif;
+}
+
+</style>
+</head>
+<body>
+<script>
+
+var comma = d3.format(",");
+
+var UUID = PUBNUB.db.get('session') || (function(){
+    var uuid = PUBNUB.uuid();
+    PUBNUB.db.set('session', uuid);
+    return uuid;
+})();
+
+var M = {
+	config:{
+		pubnub:{
+			publish_key: 'pub-c-9834d8e8-9555-49fb-a3ae-ad564fb630b0',
+			subscribe_key: 'sub-c-e31572f0-13e0-11e5-90f9-02ee2ddab7fe',
+			uuid: UUID,
+			channel:'dbkl-parking'
+		}
+	}
+};
+
+
+function params()	{
+	var m={current:{}};
+	if (document.location.search) document.location.search.substring(1).split('&').forEach(function(d){
+		var c=d.split('=');
+		m.current[c[0].trim()] = c[1]&&c[1].length ? c[1].trim() : '';
+	});
+	try{if(!M) M={};} catch(e){M={}};
+	M=$.extend(true,{},M,m);
+}
+
+params();
+
+
+console.info('M',M);
+
+
+var pubnub = PUBNUB.init({
+	publish_key: M.config.pubnub.publish_key,
+	subscribe_key:  M.config.pubnub.subscribe_key,
+	uuid: M.config.pubnub.uuid,
+});
+
+pubnub.subscribe({
+	channel: M.config.pubnub.channel,
+	message: function(m){
+		console.log('message',m);
+
+		eval( "var msg = "+m);
+		console.log('message',msg);
+
+		updateChart(msg);
+	}
+});
+
+
+navigator.geolocation.getCurrentPosition(function (position) {
+	console.log("I am located at: " + position.coords.latitude + ", " + position.coords.longitude);
+});
+
+navigator.geolocation.watchPosition(function (position) {
+	console.log("I am now located at: " + position.coords.latitude + ", " + position.coords.longitude);
+});
+
+
+
+
+
+
+d3.select('body').append('div').attr('class','row').call(function(sel)	{
+
+	sel.append('div').attr('class','col-xs-12 col-sm-6 col-md-4')
+		.attr('id','container');
+
+	sel.append('div').attr('class','col-xs-12 col-sm-6 col-md-4');
+	sel.append('div').attr('class','col-xs-12 col-sm-6 col-md-4');
+
+});
+
+
+
+
+//var url = '//api.aga.my/viz/parking/?' + [
+var url = '/api/viz/parking/?' + [
+	'callback=?'
+].join('&');
+
+$.getJSON(url, function(res){
+
+	console.log('url',url, res);
+
+	M.data = res.result;
+	initChart(M.data);
+
+});
+
+
+
+function updateChart(res)	{
+
+	M.data.filter(function(d){ return d.id==res.id}).forEach(function(d){
+		d.occupied = +res.occupied;
+		d.available = +res.available;
+	});
+
+	initChart(M.data);
+
+}
+
+
+function initChart(res)	{
+
+
+
+//    var colors = Highcharts.getOptions().colors,
+  var colors = chroma.brewer.Pastel2,
+      mallData = [],
+      statusData = [],
+      i,
+      j,
+      drillDataLen,
+      brightness;
+
+
+	var data2=[], cat2=[];
+
+	res.sort(
+		d3.comparator()
+			.order(d3.descending, function(d){ return +d.max_available })
+	).forEach(function(d,i){
+
+		cat2.push(d.id);
+		data2.push({
+			y: +d.max_available,
+			color: colors[i],
+			drilldown: {
+				name: d.id+' Status',
+				categories:[
+					'Available',
+					'Occupied',
+				],
+				data:[
+					+d.available,
+					+d.occupied,
+				],
+				color: colors[i]
+			}
+		});
+
+	});
+
+
+	var categories = cat2;
+	var data = data2;
+	var dataLen = data.length;
+
+	console.log('data',data);
+
+
+  // Build the data arrays
+  for (i = 0; i < dataLen; i += 1) {
+
+      // add browser data
+      mallData.push({
+          name: categories[i],
+          y: data[i].y,
+          color: chroma(data[i].color).darker().hex()
+      });
+
+      // add version data
+      drillDataLen = data[i].drilldown.data.length;
+      for (j = 0; j < drillDataLen; j += 1) {
+          brightness = 0.2 - (j / drillDataLen) / 5;
+          statusData.push({
+              name: data[i].drilldown.categories[j],
+              y: data[i].drilldown.data[j],
+//                color: Highcharts.Color(data[i].color).brighten(brightness).get()
+
+//              color: j%2==0
+//              	? chroma(data[i].color).brighter().hex()
+//              	: chroma(data[i].color).darker().hex()
+
+//              color: j%2==0
+//              	? chroma(data[i].color).darker().hex()
+//              	: data[i].color
+
+              color: j%2==0
+              	? data[i].color
+              	: chroma(data[i].color).darker().hex()
+
+
+//              color: j%2==0 ? data[i].color : '#fff'
+          });
+      }
+  }
+
+	if (M.chart)	{
+
+		var chart =  M.chart.highcharts();
+		chart.series[1].setData(statusData);
+
+	}else	{
+
+    // Create the chart
+    M.chart = $('#container').highcharts({
+        chart: {
+          type: 'pie'
+        },
+        credits: {
+        	enabled: false
+        },
+        title: {
+          text: 'Available Parking Spots'
+        },
+        subtitle: {
+            text: 'KL Shopping Malls'
+        },
+        yAxis: {
+            title: {
+                text: 'Total spots'
+            }
+        },
+        plotOptions: {
+            pie: {
+                shadow: false,
+                center: ['50%', '50%'],
+                borderWidth:0,
+
+
+            }
+        },
+        tooltip: {
+            //valueSuffix: '%'
+        },
+        series: [{
+            name: 'Max Spots',
+            data: mallData,
+            //size: '70%',
+            dataLabels: {
+                formatter: function () {
+                    return this.y > 5 ? this.point.name : null;
+                },
+                color: 'white',
+                distance: -70
+            }
+        }, {
+            name: 'Spots',
+            data: statusData,
+            size: '95%',
+            innerSize: '70%',
+            dataLabels: {
+                distance: -20,
+                formatter: function () {
+                    // display only if larger than 1
+                    //var obj = $.extend(true,{},this);
+                    //console.log('obj',obj);
+
+                    return this.key == 'Available' ? '<b>'+ comma(this.y) + '<b>'  : null;
+                }
+            }
+        }]
+    });
+
+	}
+
+}
+
+</script>
+</body>

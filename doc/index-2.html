@@ -1,0 +1,71 @@
+<script src="https://cdn.pubnub.com/pubnub-dev.js"></script>
+
+<!-- Instantiate PubNub -->
+<script type="text/javascript">
+
+
+var UUID = PUBNUB.db.get('session') || (function(){
+    var uuid = PUBNUB.uuid();
+    PUBNUB.db.set('session', uuid);
+    return uuid;
+})();
+
+console.info('UUID',UUID);
+
+var pubnub = PUBNUB.init({
+	publish_key: 'pub-c-9834d8e8-9555-49fb-a3ae-ad564fb630b0',
+	subscribe_key: 'sub-c-e31572f0-13e0-11e5-90f9-02ee2ddab7fe',
+	uuid: UUID
+});
+
+// Storage is not enabled for this subscribe key. Please contact help@pubnub.com"
+//pubnub.history({
+//	channel : 'dbkl-parking',
+//	count : 100,
+//	callback : function(m){console.log('history', m)}
+//});
+
+// Subscribe to the demo_tutorial channel
+pubnub.subscribe({
+	channel: 'dbkl-parking',
+	message: function(m){console.log('message',m)}
+});
+
+
+navigator.geolocation.getCurrentPosition(function (position) {
+	console.log("I am located at: " + position.coords.latitude + ", " + position.coords.longitude);
+});
+
+navigator.geolocation.watchPosition(function (position) {
+	console.log("I am now located at: " + position.coords.latitude + ", " + position.coords.longitude);
+});
+// - See more at: http://www.pubnub.com/blog/building-real-time-geolocation-apps-with-javascript-and-pubnub/#sthash.nh0wYHz4.dpuf
+
+//
+//function calculate_payload_size( channel, message ) {
+//    return encodeURIComponent(
+//        channel + JSON.stringify(message)
+//    ).length + 100;
+//}
+//
+//var channel = "demo_tutorial";
+//var message = {
+//    "name" : "Rob Middleton",
+//    "company" : "Lyft",
+//    "language" : "JavaScript" };
+//
+//var size = calculate_payload_size( channel, message );
+//
+//console.log( "Payload Size: ", size );
+//
+//
+//	// Publish a simple message to the demo_tutorial channel
+//	PUBNUB_demo.publish({
+//	    channel: 'demo_tutorial',
+//	    message: message
+//	});
+
+
+</script>
+
+
